@@ -11,7 +11,8 @@
   "license": "MIT",
   "autoload": {
     "psr-4": {
-      "Note\\Container\\": "src/"
+      "Note\\Container\\": "src/",
+      "Note\\Container\\Demo\\": "demo/"
     }
   },
   "authors": [
