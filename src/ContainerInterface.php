@@ -66,8 +66,30 @@ interface ContainerInterface extends PsrContainer
      */
     public function singleton(string $abstract, string|Closure|null $concrete = null): void;
 
-    // todo resolve
-    // todo make
+    /**
+     * Undocumented function
+     *
+     * @param string $abstract
+     * @param array $parameters
+     *
+     * @return mixed
+     *
+     * @throws ContainerException
+     */
+    public function resolve(string $abstract, array $parameters = []): mixed;
+
+    /**
+     * Undocumented function
+     *
+     * @param string $abstract
+     * @param array $parameters
+     *
+     * @return mixed
+     *
+     * @throws ContainerException
+     */
+    public function make(string $abstract, array $parameters = []): mixed;
+
     // todo call
 
     /**
@@ -83,7 +105,30 @@ interface ContainerInterface extends PsrContainer
      */
     public function alias(string $alias, string $abstract): void;
 
-    // todo isShared
-    // todo isAlias
-    // todo getAlias
+    /**
+     * Undocumented function
+     *
+     * @param string $abstract
+     *
+     * @return bool
+     */
+    public function isShared(string $abstract);
+
+    /**
+     * Undocumented function
+     *
+     * @param string $alias
+     *
+     * @return bool
+     */
+    public function isAlias(string $alias): bool;
+
+    /**
+     * Undocumented function
+     *
+     * @param string $alias
+     *
+     * @return string|bool
+     */
+    public function getAlias(string $alias): string|bool;
 }
