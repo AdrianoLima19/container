@@ -179,7 +179,47 @@ class Container implements ContainerInterface
      */
     public function make(string $abstract, array $parameters = []): mixed
     {
-        throw new ContainerException('Method not yet implemented', 1);
+        if (isset($this->instance[$abstract])) return $this->instance[$abstract];
+
+        if ($this->has($abstract)) {
+
+            $bind = $this->bindings[$abstract];
+        } else if ($this->isAlias($abstract)) {
+
+            $bind = $this->bindings[$this->getAlias($abstract)];
+        } else {
+
+            throw new NotFoundException(self::class . "::make() Argument #1 \$abstract could not be resolved or target class [{$abstract}] was not registered in the container.", E_USER_ERROR);
+        }
+
+        if ($bind['concrete'] instanceof Closure) {
+
+            if ($bind['shared']) return $this->instance[$abstract] = $bind['concrete']($this);
+
+            return $bind['concrete']($this);
+        }
+
+        $class = new ReflectionClass($bind['concrete']);
+
+        if (!$class->isInstantiable()) {
+
+            throw new ContainerException(self::class . "::resolve() Argument #1 \$abstract {$abstract} is not instantiable.", E_USER_ERROR);
+        }
+
+        $dependencies = $class?->getConstructor()?->getParameters();
+
+        if (empty($dependencies)) {
+
+            if ($bind['shared']) return $this->instance[$abstract] = $class->newInstanceWithoutConstructor();
+
+            return $class->newInstanceWithoutConstructor();
+        }
+
+        $dependencies = $this->resolveDependencies($dependencies, $parameters, $abstract);
+
+        if ($bind['shared']) return $this->instance[$abstract] = $class->newInstanceArgs($dependencies);
+
+        return $class->newInstanceArgs($dependencies);
     }
 
     /**
