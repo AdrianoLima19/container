@@ -2,373 +2,320 @@
 
 declare(strict_types=1);
 
-namespace Note\Container;
+namespace Artosh\Container;
 
 use Closure;
+use TypeError;
 use ReflectionClass;
-use Note\Container\ContainerInterface;
-use Note\Container\Exception\NotFoundException;
-use Note\Container\Exception\ContainerException;
+use ReflectionMethod;
+use ReflectionFunction;
+use Artosh\Container\Exception\NotFoundException;
+use Artosh\Container\Exception\ContainerException;
 
 class Container implements ContainerInterface
 {
     /**
-     * Undocumented variable
-     *
-     * @var array[]
+     * @var array
      */
-    protected $bindings = [];
+    protected $binding;
 
     /**
-     * Undocumented variable
-     *
-     * @var array[]
+     * @var object[]
      */
-    protected $instances = [];
+    protected $resolved;
 
     /**
-     * Undocumented variable
+     * @param  string $id
      *
-     * @var array[]
-     */
-    protected $aliases = [];
-
-    /**
-     * @inheritDoc
-     */
-    public function get(string $id)
-    {
-    }
-
-    /**
-     * Undocumented function
-     *
-     * @param string $id
-     * @param string|Closure|null $entry
-     *
-     * @return void
-     *
-     * @throws ContainerException
-     */
-    public function set(string $id, string|Closure|null $entry = null): void
-    {
-        $this->setBindings($id, $entry, false, 'set', 'entry');
-    }
-
-    /**
-     * @inheritDoc
+     * @return bool
      */
     public function has(string $id): bool
     {
-        return isset($this->bindings[$id]);
+        return isset($this->binding[$id]);
     }
 
     /**
-     * Undocumented function
+     * @param  string $id
      *
-     * @param string $abstract
-     * @param string|Closure|null $concrete
-     * @param bool $shared
+     * @return mixed
+     *    
+     * @throws TypeError
+     * @throws NotFoundException
+     */
+    public function get(string $id): mixed
+    {
+        if (isset($this->binding[$id])) {
+            return $this->make($id);
+        }
+
+        throw new NotFoundException(sprintf("%s::get() \$id was not set in container. found null", self::class), E_ERROR);
+    }
+
+    /**
+     * @param  string               $id
+     * @param  string|\Closure|null $entry
      *
      * @return void
-     *
+     * 
      * @throws ContainerException
      */
-    public function bind(string $abstract, string|Closure|null $concrete = null, bool $shared = false): void
+    public function set(string $id, string|\Closure $entry = null): void
     {
-        $this->setBindings($abstract, $concrete, $shared);
+        $this->createBind($id, $entry, false);
     }
 
     /**
-     * Undocumented function
-     *
-     * @param string $abstract
+     * @param  string $id
      *
      * @return void
      */
-    public function unbind(string $abstract): void
+    public function unset(string $id): void
     {
         unset(
-            $this->bindings[$abstract],
-            $this->instances[$abstract]
+            $this->binding[$id],
+            $this->resolved[$id]
         );
     }
 
     /**
-     * Undocumented function
-     *
-     * @param string $abstract
+     * @param  string $id
      *
      * @return bool
      */
-    public function bound(string $abstract): bool
+    public function isShared(string $id): bool
     {
-        return $this->has($abstract);
+        if (!$this->has($id)) {
+            return false;
+        }
+
+        return $this->binding[$id]['shared'];
     }
 
     /**
-     * Undocumented function
-     *
-     * @param string $abstract
-     * @param string|Closure|null $concrete
+     * @param  string               $id
+     * @param  string|\Closure|null $entry
      *
      * @return void
-     *
-     * @throws ContainerException
+     *    
+     * @throws TypeError
      */
-    public function singleton(string $abstract, string|Closure|null $concrete = null): void
+    public function share(string $id, string|\Closure $entry = null): void
     {
-        $this->setBindings($abstract, $concrete, true, 'singleton');
+        $this->createBind($id, $entry, true);
     }
 
     /**
-     * Undocumented function
-     *
-     * @param string $abstract
-     * @param array $parameters
+     * @param  string $id
+     * @param  array  $parameters
      *
      * @return mixed
-     *
-     * @throws ContainerException
-     */
-    public function resolve(string $abstract, array $parameters = []): mixed
-    {
-        if (isset($this->instance[$abstract])) return $this->instance[$abstract];
-
-        $bind = $this->resolveBinding($abstract);
-
-        if ($bind['concrete'] instanceof Closure) {
-
-            if ($bind['shared']) return $this->instance[$abstract] = $bind['concrete']($this);
-
-            return $bind['concrete']($this);
-        }
-
-        $class = new ReflectionClass($bind['concrete']);
-
-        if (!$class->isInstantiable()) {
-
-            throw new ContainerException(self::class . "::resolve() Argument #1 \$abstract {$abstract} is not instantiable.", E_USER_ERROR);
-        }
-
-        $dependencies = $class?->getConstructor()?->getParameters();
-
-        if (empty($dependencies)) {
-
-            if ($bind['shared']) return $this->instance[$abstract] = $class->newInstanceWithoutConstructor();
-
-            return $class->newInstanceWithoutConstructor();
-        }
-
-        $dependencies = $this->resolveDependencies($dependencies, $parameters, $abstract);
-
-        if ($bind['shared']) return $this->instance[$abstract] = $class->newInstanceArgs($dependencies);
-
-        return $class->newInstanceArgs($dependencies);
-    }
-
-    /**
-     * Undocumented function
-     *
-     * @param string $abstract
-     * @param array $parameters
-     *
-     * @return mixed
-     *
-     * @throws ContainerException
-     */
-    public function make(string $abstract, array $parameters = []): mixed
-    {
-        if (isset($this->instance[$abstract])) return $this->instance[$abstract];
-
-        if ($this->has($abstract)) {
-
-            $bind = $this->bindings[$abstract];
-        } else if ($this->isAlias($abstract)) {
-
-            $bind = $this->bindings[$this->getAlias($abstract)];
-        } else {
-
-            throw new NotFoundException(self::class . "::make() Argument #1 \$abstract could not be resolved or target class [{$abstract}] was not registered in the container.", E_USER_ERROR);
-        }
-
-        if ($bind['concrete'] instanceof Closure) {
-
-            if ($bind['shared']) return $this->instance[$abstract] = $bind['concrete']($this);
-
-            return $bind['concrete']($this);
-        }
-
-        $class = new ReflectionClass($bind['concrete']);
-
-        if (!$class->isInstantiable()) {
-
-            throw new ContainerException(self::class . "::resolve() Argument #1 \$abstract {$abstract} is not instantiable.", E_USER_ERROR);
-        }
-
-        $dependencies = $class?->getConstructor()?->getParameters();
-
-        if (empty($dependencies)) {
-
-            if ($bind['shared']) return $this->instance[$abstract] = $class->newInstanceWithoutConstructor();
-
-            return $class->newInstanceWithoutConstructor();
-        }
-
-        $dependencies = $this->resolveDependencies($dependencies, $parameters, $abstract);
-
-        if ($bind['shared']) return $this->instance[$abstract] = $class->newInstanceArgs($dependencies);
-
-        return $class->newInstanceArgs($dependencies);
-    }
-
-    /**
-     * Undocumented function
-     *
-     * @param string $alias
-     * @param string $abstract
-     *
-     * @return void
-     *
+     * 
      * @throws NotFoundException
      * @throws ContainerException
      */
-    public function alias(string $alias, string $abstract): void
+    public function make(string $id, array $parameters = []): mixed
     {
-        // todo fix error message
-        if (!$this->has($abstract)) throw new NotFoundException("Error Processing Request", E_ERROR);
-        if (!is_string($alias)) throw new ContainerException("Error Processing Request", E_ERROR);
-        if ($alias === $abstract) throw new ContainerException("Error Processing Request", E_ERROR);
-
-        $this->aliases[$alias] = $abstract;
-    }
-
-    /**
-     * Undocumented function
-     *
-     * @param string $abstract
-     *
-     * @return bool
-     */
-    public function isShared(string $abstract)
-    {
-        return
-            isset($this->bindings[$abstract]) && $this->bindings[$abstract]['shared'] === true ||
-            isset($this->bindings[$this->getAlias($abstract)]) && $this->bindings[$this->getAlias($abstract)]['shared'] == true;
-    }
-
-    /**
-     * Undocumented function
-     *
-     * @param string $alias
-     *
-     * @return bool
-     */
-    public function isAlias(string $alias): bool
-    {
-        return isset($this->aliases[$alias]);
-    }
-
-    /**
-     * Undocumented function
-     *
-     * @param string $alias
-     *
-     * @return string|bool
-     */
-    public function getAlias(string $alias): string|bool
-    {
-        return isset($this->aliases[$alias])
-            ? $this->aliases[$alias]
-            : false;
-    }
-
-    /**
-     * @param string $abstract
-     * @param string|Closure|null $concrete
-     * @param bool $shared
-     *
-     * @return void
-     *
-     * @throws ContainerException
-     */
-    private function setBindings(string $abstract, string|Closure|null $concrete = null, bool $shared = false): void
-    {
-        $this->unbind($abstract);
-
-        if (is_null($concrete)) $concrete = $abstract;
-
-        if (!$concrete instanceof Closure && !class_exists($concrete)) {
-
-            $method = count(func_get_args()) >= 4 ? func_get_arg(3) : 'bind';
-            $param = count(func_get_args()) >= 5 ? func_get_arg(4) : 'concrete';
-
-            throw new ContainerException(self::class . "::{$method}() Argument #2 \${$param} could not be resolved or class does not exist.", E_ALL);
+        if (isset($this->resolved[$id])) {
+            return $this->resolved[$id];
         }
 
-        $this->bindings[$abstract] = compact('concrete', 'shared');
-    }
-
-    /**
-     * Undocumented function
-     *
-     * @param string $abstract
-     *
-     * @return array
-     *
-     * @throws NotFoundException
-     */
-    private function resolveBinding(string $abstract): array
-    {
-        if ($this->has($abstract)) return $this->bindings[$abstract];
-
-        if ($this->isAlias($abstract)) return $this->bindings[$this->getAlias($abstract)];
-
-        if (class_exists($abstract)) {
-            return [
-                'concrete' => $abstract,
-                'shared' => false
+        if ($this->has($id)) {
+            $bind = $this->binding[$id];
+        } else if (class_exists($id)) {
+            $bind = [
+                'entry' => $id,
+                'shared' => false,
             ];
+        } else {
+            throw new NotFoundException(sprintf("%s::make() Argument #1 \$id could not be resolved or target class [%s] does not exist.", self::class, $id), E_ERROR);
         }
 
-        throw new NotFoundException(self::class . "::resolve() Argument #1 \$abstract could not be resolved or target class [{$abstract}] does not exist.", E_USER_ERROR);
-    }
+        if ($bind['entry'] instanceof Closure) {
+            if ($bind['shared']) {
+                return $this->resolved[$id] = $bind['entry']($this);
+            }
 
-    /**
-     * Undocumented function
-     *
-     * @param array $dependencies
-     * @param array $parameters
-     * @param string $abstract
-     *
-     * @return array
-     *
-     * @throws NotFoundException
-     */
-    private function resolveDependencies(array $dependencies, array $parameters = [], string $abstract): array
-    {
+            return $bind['entry']($this);
+        }
+
+        $reflectClass = new ReflectionClass($bind['entry']);
+
+        if (!$reflectClass->isInstantiable()) {
+            $method = (debug_backtrace()[1]['function']  ?? 'make');
+            throw new ContainerException(sprintf("%s::%s() Argument #1 \$id [%s] is not instantiable.", self::class, $method, $id), E_ERROR);
+        }
+
+        $dependencies = $reflectClass?->getConstructor()?->getParameters();
+
+        if (empty($dependencies)) {
+            if ($bind['shared']) {
+                return $this->resolved[$id] = $reflectClass->newInstanceWithoutConstructor();
+            }
+
+            return $reflectClass->newInstanceWithoutConstructor();
+        }
+
         $resolve = [];
 
         foreach ($dependencies as $dependency) {
             $name = $dependency->name;
 
-            if (!empty($parameters[$name]) && $resolve[] = $parameters[$name]) continue;
+            if (!empty($parameters[$name]) && $resolve[] = $parameters[$name]) {
+                continue;
+            }
 
-            if ($class = $dependency->getClass()?->name) {
-
-                $resolve[] = $this->resolve($class, $parameters);
+            if (class_exists($class = $dependency->getType()?->getName())) {
+                $resolve[] = $this->make($class, $parameters);
                 continue;
             }
 
             if ($dependency->isDefaultValueAvailable()) {
-
                 $resolve[] = $dependency->getDefaultValue();
                 continue;
             }
 
-            throw new NotFoundException("Error Processing Request {$abstract}", 1); //todo fix error message
+            if ($dependency->getType()?->allowsNull()) {
+                $resolve[] = null;
+                continue;
+            }
+
+            throw new NotFoundException("Error Processing Request {$id}", 1);
         }
 
-        return $resolve;
+        if ($bind['shared']) {
+            return $this->resolved[$id] = $reflectClass->newInstanceArgs($resolve);
+        }
+
+        return $reflectClass->newInstanceArgs($resolve);
+    }
+
+    /**
+     * @param  string|array|callable $callback
+     * @param  array                 $parameters
+     *
+     * @return mixed
+     * 
+     * @throws NotFoundException
+     * @throws ContainerException
+     */
+    public function call(string|array|callable $callback, array $parameters = []): mixed
+    {
+        if (is_string($callback) && strpos($callback, "::")) {
+            $callback = explode("::", $callback);
+        }
+
+        if (is_array($callback)) {
+            if ($this->has($callback[0])) {
+                $callback[0] = $this->binding[$callback[0]]['entry'];
+            }
+            if (!class_exists($callback[0])) {
+                throw new ContainerException("Error Processing Request", 1);
+            }
+            $reflectClass = new ReflectionMethod($callback[0], $callback[1]);
+        } else if (gettype($callback) === 'object') {
+            if (method_exists($callback, '__invoke')) {
+                $reflectClass = new ReflectionMethod($callback, '__invoke');
+            } else {
+                throw new ContainerException(self::class . "::call() Argument #1 \$callback method not provided nor the class have a __invoke method.", E_ERROR);
+            }
+        } else {
+            $reflectClass = new ReflectionFunction($callback);
+        }
+
+        $resolve = [];
+
+        foreach ($reflectClass?->getParameters() as $param) {
+            $name = $param->name;
+
+            if (!empty($parameters[$name]) && $resolve[] = $parameters[$name]) {
+                continue;
+            }
+
+            if (class_exists($class = $param->getType()?->getName())) {
+                $resolve[] = $this->make($class, $parameters);
+                continue;
+            }
+
+            if ($param->isDefaultValueAvailable()) {
+                $resolve[] = $param->getDefaultValue();
+                continue;
+            }
+
+            if ($param->getType()?->allowsNull()) {
+                $resolve[] = null;
+                continue;
+            }
+
+            throw new NotFoundException("Error Processing Request {$callback[0]}", 1);
+        }
+
+        if (gettype($callback) === 'string' || $callback instanceof Closure || gettype($callback) === 'object') {
+
+            return $reflectClass->invokeArgs($callback, $resolve);
+        }
+
+        if (is_string($callback[0])) {
+
+            $callback[0] = $this->make($callback[0], $parameters);
+        }
+
+        return $reflectClass->invokeArgs($callback[0], $resolve);
+    }
+
+    /**
+     * @return void
+     */
+    public function reset(): void
+    {
+        unset(
+            $this->binding,
+            $this->resolved,
+        );
+    }
+
+    final public function __destruct()
+    {
+        $this->reset();
+    }
+
+    private function __clone()
+    {
+    }
+
+    public function __get($arg)
+    {
+        throw new ContainerException("Error Processing Request", 1);
+    }
+
+    /**
+     * @param  string               $id
+     * @param  string|\Closure|null $entry
+     * @param  bool                 $shared
+     *
+     * @return void
+     * 
+     * @throws TypeError
+     */
+    private function createBind(string $id, string|\Closure $entry = null, bool $shared = false)
+    {
+        unset(
+            $this->binding[$id],
+            $this->resolved[$id]
+        );
+
+        if (is_null($entry)) {
+            $entry = $id;
+        }
+
+        if (!$entry instanceof Closure && !is_string($entry)) {
+            $method = (debug_backtrace()[1]['function']  ?? 'set');
+
+            throw new TypeError(
+                sprintf("%s::%s() \$entry expected type 'string|\\Closure|null'. found %s", self::class, $method, gettype($entry)),
+                E_ERROR
+            );
+        }
+
+        $this->binding[$id] = compact('entry', 'shared');
     }
 }

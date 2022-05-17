@@ -2,133 +2,90 @@
 
 declare(strict_types=1);
 
-namespace Note\Container;
+namespace Artosh\Container;
 
-use Closure;
+use TypeError;
+use Artosh\Container\Exception\NotFoundException;
+use Artosh\Container\Exception\ContainerException;
 use Psr\Container\ContainerInterface as PsrContainer;
-use Psr\Container\NotFoundExceptionInterface as NotFoundException;
-use Psr\Container\ContainerExceptionInterface as ContainerException;
 
 interface ContainerInterface extends PsrContainer
 {
     /**
-     * Undocumented function
-     *
-     * @param string $id
-     * @param string|Closure|null $entry
-     *
-     * @return void
-     *
-     * @throws ContainerException
-     */
-    public function set(string $id, string|Closure|null $entry = null): void;
-
-    /**
-     * Undocumented function
-     *
-     * @param string $abstract
-     * @param string|Closure|null $concrete
-     * @param bool $shared
-     *
-     * @return void
-     *
-     * @throws ContainerException
-     */
-    public function bind(string $abstract, string|Closure|null $concrete = null, bool $shared = false): void;
-
-    /**
-     * Undocumented function
-     *
-     * @param string $abstract
-     *
-     * @return void
-     */
-    public function unbind(string $abstract): void;
-
-    /**
-     * Undocumented function
-     *
-     * @param string $abstract
+     * @param  string $id
      *
      * @return bool
      */
-    public function bound(string $abstract): bool;
+    public function has(string $id): bool;
 
     /**
-     * Undocumented function
-     *
-     * @param string $abstract
-     * @param string|Closure|null $concrete
-     *
-     * @return void
-     *
-     * @throws ContainerException
-     */
-    public function singleton(string $abstract, string|Closure|null $concrete = null): void;
-
-    /**
-     * Undocumented function
-     *
-     * @param string $abstract
-     * @param array $parameters
+     * @param  string $id
      *
      * @return mixed
-     *
-     * @throws ContainerException
+     *    
+     * @throws TypeError
+     * @throws NotFoundException
      */
-    public function resolve(string $abstract, array $parameters = []): mixed;
+    public function get(string $id): mixed;
 
     /**
-     * Undocumented function
-     *
-     * @param string $abstract
-     * @param array $parameters
-     *
-     * @return mixed
-     *
-     * @throws ContainerException
-     */
-    public function make(string $abstract, array $parameters = []): mixed;
-
-    // todo call
-
-    /**
-     * Undocumented function
-     *
-     * @param string $alias
-     * @param string $abstract
+     * @param  string               $id
+     * @param  string|\Closure|null $entry
      *
      * @return void
+     * 
+     * @throws ContainerException
+     */
+    public function set(string $id, string|\Closure $entry = null): void;
+
+    /**
+     * @param  string $id
      *
+     * @return void
+     */
+    public function unset(string $id): void;
+
+    /**
+     * @param  string $id
+     *
+     * @return bool
+     */
+    public function isShared(string $id): bool;
+
+    /**
+     * @param  string               $id
+     * @param  string|\Closure|null $entry
+     *
+     * @return void
+     *    
+     * @throws TypeError
+     */
+    public function share(string $id, string|\Closure $entry = null): void;
+
+    /**
+     * @param  string $id
+     * @param  array  $parameters
+     *
+     * @return mixed
+     * 
      * @throws NotFoundException
      * @throws ContainerException
      */
-    public function alias(string $alias, string $abstract): void;
+    public function make(string $id, array $parameters = []): mixed;
 
     /**
-     * Undocumented function
+     * @param  string|array|callable $callback
+     * @param  array                 $parameters
      *
-     * @param string $abstract
-     *
-     * @return bool
+     * @return mixed
+     * 
+     * @throws NotFoundException
+     * @throws ContainerException
      */
-    public function isShared(string $abstract);
+    public function call(string|array|callable $callback, array $parameters = []): mixed;
 
     /**
-     * Undocumented function
-     *
-     * @param string $alias
-     *
-     * @return bool
+     * @return void
      */
-    public function isAlias(string $alias): bool;
-
-    /**
-     * Undocumented function
-     *
-     * @param string $alias
-     *
-     * @return string|bool
-     */
-    public function getAlias(string $alias): string|bool;
+    public function reset(): void;
 }

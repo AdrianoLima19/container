@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Note\Container\Exception;
+namespace Artosh\Container\Exception;
 
 use Exception;
 use Psr\Container\NotFoundExceptionInterface;
