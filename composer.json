@@ -1,25 +1,26 @@
 {
-  "name": "note/container",
-  "description": "IoC Container",
+  "name": "artosh/container",
+  "description": "DI Container",
   "type": "library",
+  "license": "MIT",
+  "authors": [
+    {
+      "role": "developer",
+      "name": "Adriano Lima de Souza",
+      "email": "adrianolima.dev@gmail.com",
+      "homepage": "https://adriano-lima.dev.br"
+    }
+  ],
+  "keywords": [
+    "container",
+    "DI"
+  ],
   "require": {
     "psr/container": "^2.0"
   },
-  "require-dev": {
-    "phpunit/phpunit": "^9.5"
-  },
-  "license": "MIT",
   "autoload": {
     "psr-4": {
-      "Note\\Container\\": "src/",
-      "Note\\Container\\Demo\\": "demo/"
+      "Artosh\\Container\\": "src/"
     }
-  },
-  "authors": [
-    {
-      "name": "Adriano Lima de Souza",
-      "email": "adrianolima.dev@gmail.com"
-    }
-  ],
-  "minimum-stability": "stable"
+  }
 }

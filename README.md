@@ -1,2 +1,3 @@
 # container
-PHP IoC Container
+
+PHP DI Container
